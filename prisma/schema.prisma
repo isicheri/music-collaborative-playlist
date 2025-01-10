@@ -14,19 +14,93 @@ datasource db {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  username String @unique
-  password String
+  id            Int            @id @default(autoincrement())
+  username      String         @unique
+  password      String
+  logintoken    LoginToken[]
+  playlists     Playlist[]
+  likePlaylists LikePlaylist[]
+  ratings       Rating[]
+  review        Review[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Playlist {
-  id Int @id @default(autoincrement())
+  id           Int            @id @default(autoincrement())
+  name         String         @unique
+  desc         String?
+  userId       Int
+  user         User           @relation(fields: [userId], references: [id])
+  songs        Song[]         @relation("PlaylistSongs")
+  likes        LikePlaylist[]
+  review       Review[]
+  playlistsong PlaylistSong[]
+  ratings      Rating[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 }
 
 model Song {
-  id Int @id @default(autoincrement())
+  id           Int            @id @default(autoincrement())
+  title        String
+  artist       String
+  genre        String?
+  url          String
+  playlists    Playlist[]     @relation("PlaylistSongs")
+  playlistsong PlaylistSong[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 }
 
 model Review {
-  id Int @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
+  text       String
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  playlistId Int
+  playlist   Playlist @relation(fields: [playlistId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model LikePlaylist {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  playlistId Int
+  playlist   Playlist @relation(fields: [playlistId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model PlaylistSong {
+  id         Int      @id @default(autoincrement())
+  songId     Int
+  playlistId Int
+  song       Song     @relation(fields: [songId], references: [id])
+  playlist   Playlist @relation(fields: [playlistId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model LoginToken {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  userId    Int
+  expireAt  DateTime
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Rating {
+  id         Int      @id @default(autoincrement())
+  value      Int
+  userId     Int
+  playlistId Int
+  user       User     @relation(fields: [userId], references: [id])
+  playlist   Playlist @relation(fields: [playlistId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
