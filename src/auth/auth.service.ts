@@ -3,7 +3,7 @@ import { PrismaService } from 'src/prisma_service/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from "bcrypt";
 import crypto from "crypto";
-import { RegisterDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { Response } from 'express';
 
 @Injectable()
@@ -16,7 +16,7 @@ constructor(
 async register(registerDto:RegisterDto) {
     const userExist = await this.prismaService.user.findUnique({
         where: {
-            username: registerDto.username
+            username: registerDto.username,
         }
     })
     if(userExist) {
@@ -27,10 +27,35 @@ async register(registerDto:RegisterDto) {
     return user
 }
 
-async login() {}
+async login(loginDto: LoginDto) {
+   
+}
 
-private validateUser() {}
+private async validateUser(loginDto: LoginDto) {
+    const userExist = await this.prismaService.user.findUnique({
+        where: {
+            username: loginDto.username
+        }
+    })
+    if(!userExist && !(await bcrypt.compare(loginDto.password,userExist.password))) {
+        throw new BadRequestException("login credentials invalid")
+    }
+}
 
-private generateToken() {}
+private async generateLoginToken(userId: number) {
+const code = crypto.randomBytes(20).toString("hex").slice(-6).toUpperCase();
+const _x_date = new Date();
+const set_x_date = _x_date.setDate(_x_date.getMinutes() + 10); // this should be ten minutes
+const loginToken = await this.prismaService.loginToken.create({
+    data: {
+        userId: userId,
+        code: code,
+        expireAt: set_x_date.toString(),
+    }
+})
+return loginToken
+}
+
+async logoutUser() {} //working on the implementation
 
 }
