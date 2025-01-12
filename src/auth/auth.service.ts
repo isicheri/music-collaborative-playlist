@@ -13,7 +13,7 @@ constructor(
     private readonly jwtService: JwtService
 ) {}
 
-async register(registerDto:RegisterDto) {
+async register(registerDto:RegisterDto,response: Response) {
     const userExist = await this.prismaService.user.findUnique({
         where: {
             username: registerDto.username,
@@ -23,37 +23,56 @@ async register(registerDto:RegisterDto) {
         throw new BadRequestException("this user already exists")
     }
     const hashedPassword = await bcrypt.hash(registerDto.password,10)
-    const user = await this.prismaService.user.create({data: {...registerDto,password:hashedPassword}});
-    return user
+    const code = crypto.randomBytes(20).toString("hex").slice(-6).toUpperCase();
+const _x_date = new Date();
+const set_x_date = _x_date.setDate(_x_date.getMinutes() + 10);
+   const [user,loginToken] = await this.prismaService.$transaction([
+    this.prismaService.user.create({
+    data: {
+        ...registerDto,
+        password: hashedPassword
+    }
+    }),
+    this.prismaService.loginToken.create({
+        data: {
+            userId: userExist.id,
+            code: code,
+            expireAt: set_x_date.toString(),
+        }
+    })
+   ])
+    response.json({
+        data: {
+            link: "",//later feature create a better feature to validate by send a link
+            user: {name : user.username},
+            code: loginToken.code
+        }
+    })
 }
 
 async login(loginDto: LoginDto) {
    
 }
 
-private async validateUser(loginDto: LoginDto) {
+private async validateUser(loginDto: LoginDto,loginCode_x: string) {
     const userExist = await this.prismaService.user.findUnique({
         where: {
             username: loginDto.username
-        }
+        },
+       include: {logintoken: true}
     })
     if(!userExist && !(await bcrypt.compare(loginDto.password,userExist.password))) {
         throw new BadRequestException("login credentials invalid")
     }
-}
+    // first we have to the isValidated property to true the generate a check if the login token is not expired the generate a jwt token for the user
 
-private async generateLoginToken(userId: number) {
-const code = crypto.randomBytes(20).toString("hex").slice(-6).toUpperCase();
-const _x_date = new Date();
-const set_x_date = _x_date.setDate(_x_date.getMinutes() + 10); // this should be ten minutes
-const loginToken = await this.prismaService.loginToken.create({
-    data: {
-        userId: userId,
-        code: code,
-        expireAt: set_x_date.toString(),
-    }
-})
-return loginToken
+    await this.prismaService.user.update({
+        where: {id: userExist.id},
+        data: {
+            isValidated: true
+        }
+    })
+
 }
 
 async logoutUser() {} //working on the implementation
