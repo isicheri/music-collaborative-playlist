@@ -5,6 +5,7 @@ import * as bcrypt from "bcrypt";
 import crypto from "crypto";
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { Response } from 'express';
+import { User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -65,13 +66,32 @@ private async validateUser(loginDto: LoginDto,loginCode_x: string) {
         throw new BadRequestException("login credentials invalid")
     }
     // first we have to the isValidated property to true the generate a check if the login token is not expired the generate a jwt token for the user
+    // ill run another transaction
+    if(userExist.logintoken[0].code === loginCode_x) {
+        
+        //working on the time it will expire
+        // if() {}
 
-    await this.prismaService.user.update({
-        where: {id: userExist.id},
-        data: {
-            isValidated: true
-        }
-    })
+        await this.prismaService.user.update({
+            where: {id: userExist.id},
+            data: {
+                isValidated: true
+            }
+        })
+        type payload = Pick<User, 'isValidated' | "username" | "id">;
+         let customPayload: payload;
+       const accessToken = this.jwtService.sign(customPayload,{secret: process.env.JWT_SECRET});
+
+        await this.prismaService.loginToken.delete({
+            where: {
+                id: userExist.logintoken[0].id,
+                userId: userExist.id
+            }
+        })
+       return {accessToken,customPayload}
+    }else {
+        throw new BadRequestException("login code is invalid");
+    }
 
 }
 
