@@ -27,25 +27,24 @@ async register(registerDto:RegisterDto,response: Response) {
     const code = randomBytes(20).toString("hex").slice(-6).toUpperCase();
 const _x_date = new Date();
 const expireAt = new Date(_x_date.getTime() + 10 * 60000);
-   const user = 
-    await this.prismaService.user.create({
+const [user] = await this.prismaService.$transaction([ 
+    this.prismaService.user.create({
     data: {
         ...registerDto,
         password: hashedPassword
     }
-    })
-   
-const loginToken =
-   await this.prismaService.loginToken.create({
+    }),
+]) 
+const loginToken = await this.prismaService.loginToken.create({
     data: {
         userId: user.id,
-        code: code,
-        expireAt: expireAt,
+        code:code,
+        expireAt: expireAt
     }
 })
     response.json({
         data: {
-            link: `${process.env.SERVER_URL}/api/login/${loginToken.code}/l=true`,//later feature create a better feature to validate by send a link
+            link: `${process.env.SERVER_URL}api/login/${loginToken.code}`,//later feature create a better feature to validate by send a link
             user: {name : user.username},
             code: loginToken.code
         }
@@ -75,7 +74,7 @@ private async generate_new_login_code(loginDto: LoginDto) {
              code: code
          }
         })
-        return {sucess: true,link: `${process.env.SERVER_URL}/api/login/${code}/l=true`,
+        return {sucess: true,link: `${process.env.SERVER_URL}api/login/${code}`,
         }
     }else {
     throw new BadRequestException("user cannot carry out this operation");
@@ -89,6 +88,7 @@ private async validateUser(loginDto: LoginDto,loginCode_x: string) {
         },
        include: {logintoken: true}
     })
+    console.log(null)
     if(!userExist && !(await bcrypt.compare(loginDto.password,userExist.password))) {
         throw new BadRequestException("login credentials invalid")
     }
