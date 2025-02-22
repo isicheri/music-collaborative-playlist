@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,32 +8,34 @@ datasource db {
 }
 
 model User {
-  id            Int            @id @default(autoincrement())
-  username      String         @unique
-  password      String
-  isValidated   Boolean?       @default(false)
-  logintoken    LoginToken[]
-  playlists     Playlist[]
-  likePlaylists LikePlaylist[]
-  ratings       Rating[]
-  review        Review[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                    Int            @id @default(autoincrement())
+  username              String         @unique
+  password              String
+  isValidated           Boolean?       @default(false)
+  logintoken            LoginToken[]
+  ownedPlaylists        Playlist[]     @relation("OwnedPlaylists")
+  collaborationPlaylist Playlist[]     @relation("PlaylistCollaborators")
+  likePlaylists         LikePlaylist[]
+  ratings               Rating[]
+  review                Review[]
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 }
 
 model Playlist {
-  id           Int            @id @default(autoincrement())
-  name         String         @unique
-  desc         String?
-  userId       Int
-  user         User           @relation(fields: [userId], references: [id])
-  songs        Song[]         @relation("PlaylistSongs")
-  likes        LikePlaylist[]
-  review       Review[]
-  playlistsong PlaylistSong[]
-  ratings      Rating[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  desc          String?
+  userId        Int
+  user          User           @relation("OwnedPlaylists", fields: [userId], references: [id])
+  songs         Song[]         @relation("PlaylistSongs")
+  likes         LikePlaylist[]
+  review        Review[]
+  playlistsong  PlaylistSong[]
+  ratings       Rating[]
+  collaborators User[]         @relation("PlaylistCollaborators")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Song {
@@ -89,7 +85,7 @@ model LoginToken {
   id        Int      @id @default(autoincrement())
   code      String   @unique
   userId    Int
-  expireAt  DateTime
+  expireAt  String
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

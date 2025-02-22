@@ -1,46 +1,51 @@
-/*
-  Warnings:
+-- CreateTable
+CREATE TABLE "User" (
+    "id" SERIAL NOT NULL,
+    "username" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
+    "isValidated" BOOLEAN DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-  - A unique constraint covering the columns `[name]` on the table `Playlist` will be added. If there are existing duplicate values, this will fail.
-  - Added the required column `name` to the `Playlist` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `updatedAt` to the `Playlist` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `userId` to the `Playlist` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `playlistId` to the `Review` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `text` to the `Review` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `updatedAt` to the `Review` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `userId` to the `Review` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `artist` to the `Song` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `title` to the `Song` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `updatedAt` to the `Song` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `url` to the `Song` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `updatedAt` to the `User` table without a default value. This is not possible if the table is not empty.
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
 
-*/
--- AlterTable
-ALTER TABLE "Playlist" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "desc" TEXT,
-ADD COLUMN     "name" TEXT NOT NULL,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL,
-ADD COLUMN     "userId" INTEGER NOT NULL;
+-- CreateTable
+CREATE TABLE "Playlist" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "desc" TEXT,
+    "userId" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
--- AlterTable
-ALTER TABLE "Review" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "playlistId" INTEGER NOT NULL,
-ADD COLUMN     "text" TEXT NOT NULL,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL,
-ADD COLUMN     "userId" INTEGER NOT NULL;
+    CONSTRAINT "Playlist_pkey" PRIMARY KEY ("id")
+);
 
--- AlterTable
-ALTER TABLE "Song" ADD COLUMN     "artist" TEXT NOT NULL,
-ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "genre" TEXT,
-ADD COLUMN     "title" TEXT NOT NULL,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL,
-ADD COLUMN     "url" TEXT NOT NULL;
+-- CreateTable
+CREATE TABLE "Song" (
+    "id" SERIAL NOT NULL,
+    "title" TEXT NOT NULL,
+    "artist" TEXT NOT NULL,
+    "genre" TEXT,
+    "url" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
--- AlterTable
-ALTER TABLE "User" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL;
+    CONSTRAINT "Song_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Review" (
+    "id" SERIAL NOT NULL,
+    "text" TEXT NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "playlistId" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Review_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "LikePlaylist" (
@@ -97,13 +102,16 @@ CREATE TABLE "_PlaylistSongs" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Playlist_name_key" ON "Playlist"("name");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "LoginToken_code_key" ON "LoginToken"("code");
 
 -- CreateIndex
 CREATE INDEX "_PlaylistSongs_B_index" ON "_PlaylistSongs"("B");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Playlist_name_key" ON "Playlist"("name");
 
 -- AddForeignKey
 ALTER TABLE "Playlist" ADD CONSTRAINT "Playlist_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

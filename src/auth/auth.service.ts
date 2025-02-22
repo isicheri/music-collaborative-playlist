@@ -1,142 +1,127 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma_service/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from "bcrypt";
 import {randomBytes} from "node:crypto";
-import { LoginDto, RegisterDto } from './dto/auth.dto';
-import { Response } from 'express';
-import { User } from '@prisma/client';
+import { LoginDto, payload, RegisterDto, UserLoginCodeType } from './dto/auth.dto';
+import { Request, Response } from 'express';
+import { SendGridService } from 'src/sendgrid_service/sendgrid.service';
 
 @Injectable()
 export class AuthService {
 constructor(
     private readonly prismaService: PrismaService,
-    private readonly jwtService: JwtService
+    private readonly jwtService: JwtService,
+    private readonly sendgridService: SendGridService
 ) {}
 
 async register(registerDto:RegisterDto,response: Response) {
-    const userExist = await this.prismaService.user.findUnique({
-        where: {
-            username: registerDto.username,
-        }
-    })
-    if(userExist) {
-        throw new BadRequestException("this user already exists")
-    }
-    const hashedPassword = await bcrypt.hash(registerDto.password,10)
-    const code = randomBytes(20).toString("hex").slice(-6).toUpperCase();
-const _x_date = new Date();
-const expireAt = new Date(_x_date.getTime() + 10 * 60000);
-const [user] = await this.prismaService.$transaction([ 
-    this.prismaService.user.create({
-    data: {
-        ...registerDto,
-        password: hashedPassword
-    }
-    }),
-]) 
-const loginToken = await this.prismaService.loginToken.create({
-    data: {
-        userId: user.id,
-        code:code,
-        expireAt: expireAt
-    }
-})
-    response.json({
-        data: {
-            link: `${process.env.SERVER_URL}api/login/${loginToken.code}`,//later feature create a better feature to validate by send a link
-            user: {name : user.username},
-            code: loginToken.code
-        }
-    })
+      try {
+        const userExist = await this.prismaService.user.findUnique({where: {username: registerDto.username,}})
+        if(userExist) {throw new BadRequestException("this user already exists")}
+        type filteredUser = Pick<RegisterDto, "username" | "password">;
+        const registerUser:filteredUser= {username: registerDto.username,password: registerDto.password};
+        const hashedPassword = await bcrypt.hash(registerUser.password,10)
+        const code = randomBytes(20).toString("hex").slice(-6).toUpperCase();
+        const _x_date = new Date();
+        const expireAt = new Date(_x_date).getTime() + 5 * 60 * 1000; 
+       return  await this.prismaService.$transaction(async (tx) => {
+        const user = await tx.user.create({data: {...registerUser,password: hashedPassword}})
+        const loginToken = await tx.loginToken.create({ data: {code: code,userId: user.id,expireAt: `${expireAt}
+`}})
+     response.json({success: true,data: {username:user.username,logincode: loginToken.code}})
+      });
+      } catch (error) {
+        throw new BadRequestException("something went wrong!")
+      }
 }
 
-async login(loginDto: LoginDto,login_code:string) {
-   let validateUser = await this.validateUser(loginDto,login_code);
-   if(!validateUser) {
-    return this.generate_new_login_code(loginDto)
-   throw new BadRequestException("could not validate user");
-   }else {
-    return {validateUser};
-   }
+async login(loginDto: LoginDto) {
+  return await this.validateUser(loginDto);
 }
 
-private async generate_new_login_code(loginDto: LoginDto) {
-    const userExist = this.prismaService.user.findUnique({where: {username: loginDto.username}});
+ async requestNewLoginCode(userLoginCodeDto: UserLoginCodeType) {
+    const userExist = await this.prismaService.user.findUnique({where: {username: userLoginCodeDto.username},include: {logintoken: true}});
+    if(userExist.logintoken.length === 1) {throw new BadRequestException("login has already been generated for you")}
     if(userExist) {
     const code = randomBytes(20).toString("hex").slice(-6).toUpperCase();
     const _x_date = new Date();
     const set_x_date = _x_date.setMinutes(_x_date.getMinutes() + 10);
         await this.prismaService.loginToken.create({
          data: {
-             userId: (await userExist).id,
+             userId: (userExist).id,
              expireAt: set_x_date.toString(),
              code: code
          }
         })
-        return {sucess: true,link: `${process.env.SERVER_URL}api/login/${code}`,
-        }
+        return {success: true,data: {username: (userExist).username,code: code}}
     }else {
     throw new BadRequestException("user cannot carry out this operation");
     }
 }
 
-private async validateUser(loginDto: LoginDto,loginCode_x: string) {
-    const userExist = await this.prismaService.user.findUnique({
-        where: {
-            username: loginDto.username
-        },
-       include: {logintoken: true}
-    })
-    console.log(null)
-    if(!userExist && !(await bcrypt.compare(loginDto.password,userExist.password))) {
-        throw new BadRequestException("login credentials invalid")
-    }
-    // first we have to the isValidated property to true the generate a check if the login token is not expired the generate a jwt token for the user
-    // ill run another transaction
-    if(userExist.logintoken[0].code === loginCode_x) {
-        let parsed_x_date_minutes = new Date(parseInt(userExist.logintoken[0].expireAt.toString()));
-        //working on the time it will expire
-        if(parsed_x_date_minutes.getMinutes() > new Date().getMinutes()) {
-        await this.prismaService.user.update({
-            where: {id: userExist.id},
-            data: {
-                isValidated: true
-            }
-        })
-        type payload = Pick<User, 'isValidated' | "username" | "id">;
-         let customPayload: payload = {
-            isValidated: true,
-            id: userExist.id,
-            username: userExist.username
-         };
-       const accessToken = this.jwtService.sign(customPayload,{secret: process.env.JWT_SECRET});
-        await this.prismaService.loginToken.delete({
-            where: {
-                id: userExist.logintoken[0].id,
-                userId: userExist.id
-            }
-        })
-       return {accessToken,customPayload}
-    }else {
-        await this.prismaService.loginToken.delete({
-            where: {
-                id: userExist.logintoken[0].id,
-                userId: userExist.id
-            }
-        })
-        throw new BadRequestException("login code expired");
-    }}else {
-        await this.prismaService.loginToken.delete({
-            where: {
-                id: userExist.logintoken[0].id,
-                userId: userExist.id
-            }
-        })
-        throw new BadRequestException("login code is invalid");
+private async validateUser(loginDto: LoginDto) {
+    const userExist = await this.prismaService.user.findUnique({where: {username: loginDto.username},include: {logintoken: true}});
+    if(!userExist) {throw new BadRequestException("user does not exist")}
+    else {
+        const comparedPassword = bcrypt.compareSync(loginDto.password,userExist.password)
+        if(!comparedPassword) {
+         throw new BadRequestException("password is incorrect")
+        }
+        if(userExist.logintoken.length === 0) {throw new BadRequestException("request for a new login code")}
+        if(userExist.logintoken[0].code === loginDto.loginCode) {
+            let parsed_x_date_minutes = new Date(parseInt(userExist.logintoken[0].expireAt.toString()));
+            if(new Date().getTime() <=  parsed_x_date_minutes.getTime()) {
+            await this.prismaService.user.update({
+                where: {id: userExist.id},
+                data: {
+                    isValidated: true
+                }
+            })
+             let customPayload: payload = {
+                isValidated: true,
+                id: userExist.id,
+                username: userExist.username
+             };
+           const accessToken = this.jwtService.sign(customPayload,{secret: process.env.JWT_SECRET});
+            await this.prismaService.loginToken.delete({
+                where: {
+                    id: userExist.logintoken[0].id,
+                    userId: userExist.id
+                }
+            })
+            return {accessToken}
+        }else {
+            await this.prismaService.loginToken.delete({
+                where: {
+                    id: userExist.logintoken[0].id,
+                    userId: userExist.id
+                }
+            })
+            throw new BadRequestException("login code expired!,request for a new one");
+        }}else {
+            await this.prismaService.loginToken.delete({
+                where: {
+                    id: userExist.logintoken[0].id,
+                    userId: userExist.id
+                }
+            })
+            throw new BadRequestException("login code is invalid! request for a new one");
+        }
     }
 }
 
-async logoutUser() {} //working on the implementation
+async logoutUser(request:Request,response:Response) {
+try {
+    const {id}= request.user;
+const userExist = await this.prismaService.user.findUnique({where: {id: id}});
+request.headers.authorization = "";
+if(!userExist) throw new NotFoundException();
+ await this.prismaService.user.update({where: {id: userExist.id},data: {isValidated: false}})
+ response.json({success: true,msg: "user successfully logged out true"})
+} catch (error) {
+    throw new BadRequestException()
+}
+} 
 
 }

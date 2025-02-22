@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
-// import  cookieParser from "cookie-parser";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
@@ -10,7 +9,6 @@ async function bootstrap() {
     allowedHeaders: ["Accept","Authorization","Content-Type","X-Requested-With","apollo-require-preflight"],
     methods: ["Get","Post","Put","Delete","Options"]
   })
-  // app.use(cookieParser())
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     transform: true,
